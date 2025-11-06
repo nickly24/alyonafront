@@ -8,6 +8,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
   const peerConnectionRef = useRef(null);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [remoteStreamReady, setRemoteStreamReady] = useState(false);
   const isInitiatorRef = useRef(false);
 
   const iceServers = {
@@ -42,6 +43,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
+    setRemoteStreamReady(false);
   }, []);
 
   const initializeMedia = useCallback(async () => {
@@ -102,8 +104,19 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
 
     pc.ontrack = (event) => {
       console.log("Received remote stream");
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+      const [remoteStream] = event.streams;
+      if (remoteVideoRef.current && remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
+        setRemoteStreamReady(true);
+        const playPromise = remoteVideoRef.current.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch((err) => {
+            console.warn(
+              "Auto-play blocked, waiting for user interaction",
+              err,
+            );
+          });
+        }
       }
     };
 
@@ -124,6 +137,10 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
         pc.connectionState === "disconnected"
       ) {
         console.warn("WebRTC connection failed or disconnected");
+        setRemoteStreamReady(false);
+      }
+      if (pc.connectionState === "closed") {
+        setRemoteStreamReady(false);
       }
     };
 
@@ -165,14 +182,17 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
         console.warn("Peer connection missing while handling answer");
         return;
       }
-      if (pc.signalingState !== "have-local-offer") {
-        console.warn(
-          "Skipping setRemoteDescription, signaling state:",
-          pc.signalingState,
-        );
+      if (pc.signalingState === "closed") {
+        console.warn("Peer connection already closed, skip remote description");
         return;
       }
-      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      const incomingAnswer = new RTCSessionDescription(data.answer);
+      const currentRemote = pc.currentRemoteDescription;
+      if (currentRemote && currentRemote.sdp === incomingAnswer.sdp) {
+        console.log("Remote description already set, skip duplicate answer");
+        return;
+      }
+      await pc.setRemoteDescription(incomingAnswer);
     } catch (error) {
       console.error("Error handling answer:", error);
     }
@@ -290,7 +310,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
             playsInline
             className="remote-video"
           />
-          {callStatus === "waiting" && (
+          {!remoteStreamReady && (
             <div className="waiting-overlay">
               <div className="spinner"></div>
               <p>Ожидание подключения...</p>
