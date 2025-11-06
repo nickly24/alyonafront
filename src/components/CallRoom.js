@@ -46,6 +46,28 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
     setRemoteStreamReady(false);
   }, []);
 
+  const attachLocalStreamToPeerConnection = useCallback(
+    (explicitPeerConnection) => {
+      const pc = explicitPeerConnection || peerConnectionRef.current;
+      const stream = localStreamRef.current;
+      if (!pc || !stream) {
+        return;
+      }
+
+      const existingSenders = pc.getSenders ? pc.getSenders() : [];
+
+      stream.getTracks().forEach((track) => {
+        const alreadyAdded = existingSenders.some(
+          (sender) => sender.track && sender.track.id === track.id,
+        );
+        if (!alreadyAdded) {
+          pc.addTrack(track, stream);
+        }
+      });
+    },
+    [],
+  );
+
   const initializeMedia = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -56,6 +78,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
+      attachLocalStreamToPeerConnection();
     } catch (error) {
       console.error("Error accessing media devices:", error);
       let errorMessage = "Не удалось получить доступ к камере/микрофону";
@@ -68,7 +91,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
       }
       alert(errorMessage);
     }
-  }, []);
+  }, [attachLocalStreamToPeerConnection]);
 
   const createOffer = useCallback(async () => {
     const pc = peerConnectionRef.current;
@@ -96,11 +119,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
     const pc = new RTCPeerConnection(iceServers);
     peerConnectionRef.current = pc;
 
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current);
-      });
-    }
+    attachLocalStreamToPeerConnection(pc);
 
     pc.ontrack = (event) => {
       console.log("Received remote stream");
@@ -150,7 +169,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
         createOffer();
       }, 300);
     }
-  }, [createOffer, socket, username]);
+  }, [attachLocalStreamToPeerConnection, createOffer, socket, username]);
 
   const handleOffer = useCallback(
     async (data) => {
