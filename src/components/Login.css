@@ -1,0 +1,131 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 30px;
+  padding: 40px 30px;
+  box-shadow: 0 20px 60px rgba(255, 182, 193, 0.4);
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+  backdrop-filter: blur(10px);
+}
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  max-width: 120px;
+  max-height: 120px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 20px;
+}
+
+.login-title {
+  font-size: 2.5rem;
+  color: #ff69b4;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.login-subtitle {
+  font-size: 1.2rem;
+  color: #d63384;
+  margin-bottom: 40px;
+}
+
+.user-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.user-button {
+  padding: 20px 40px;
+  font-size: 1.5rem;
+  border: 3px solid #ffb6c1;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ffeef5 0%, #ffd6e8 100%);
+  color: #d63384;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+
+.user-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(255, 182, 193, 0.5);
+  background: linear-gradient(135deg, #ffd6e8 0%, #ffb6c1 100%);
+  border-color: #ff69b4;
+}
+
+.user-button.selected {
+  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  color: white;
+  border-color: #ff1493;
+  box-shadow: 0 10px 30px rgba(255, 105, 180, 0.6);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .login-card {
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  .logo {
+    max-width: 100px;
+    max-height: 100px;
+  }
+
+  .login-title {
+    font-size: 2rem;
+  }
+
+  .login-subtitle {
+    font-size: 1rem;
+    margin-bottom: 30px;
+  }
+
+  .user-button {
+    padding: 16px 30px;
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 10px;
+  }
+
+  .login-card {
+    padding: 25px 15px;
+  }
+
+  .logo {
+    max-width: 80px;
+    max-height: 80px;
+  }
+
+  .login-title {
+    font-size: 1.75rem;
+  }
+
+  .user-button {
+    padding: 14px 25px;
+    font-size: 1.1rem;
+  }
+}
+
