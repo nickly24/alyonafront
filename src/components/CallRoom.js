@@ -122,9 +122,27 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
     attachLocalStreamToPeerConnection(pc);
 
     pc.ontrack = (event) => {
-      console.log("Received remote stream");
-      const [remoteStream] = event.streams;
-      if (remoteVideoRef.current && remoteStream) {
+      console.log("Received remote track", event.streams);
+      if (!remoteVideoRef.current) {
+        return;
+      }
+
+      let remoteStream = null;
+      if (event.streams && event.streams.length > 0) {
+        [remoteStream] = event.streams;
+      } else {
+        const currentStream = remoteVideoRef.current.srcObject;
+        if (currentStream instanceof MediaStream) {
+          remoteStream = currentStream;
+          if (!remoteStream.getTrackById(event.track.id)) {
+            remoteStream.addTrack(event.track);
+          }
+        } else {
+          remoteStream = new MediaStream([event.track]);
+        }
+      }
+
+      if (remoteStream) {
         remoteVideoRef.current.srcObject = remoteStream;
         setRemoteStreamReady(true);
         const playPromise = remoteVideoRef.current.play();
