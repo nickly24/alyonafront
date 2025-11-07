@@ -83,6 +83,40 @@
   object-fit: cover;
 }
 
+.video-off-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.68);
+  color: #ffffff;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.video-off-overlay .video-off-icon {
+  font-size: 2.4rem;
+}
+
+.video-off-overlay.local {
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffb6c1;
+  font-size: 1rem;
+  border: 2px dashed rgba(255, 182, 193, 0.5);
+}
+
+.video-off-overlay.remote {
+  background: rgba(0, 0, 0, 0.7);
+}
+
 .remote-video-wrapper.portrait + .local-video-wrapper {
   bottom: clamp(16px, 10vh, 60px);
   right: clamp(16px, 6vw, 48px);

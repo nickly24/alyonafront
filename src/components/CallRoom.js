@@ -8,10 +8,21 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
   const peerConnectionRef = useRef(null);
   const remoteMediaStreamRef = useRef(new MediaStream());
   const [remoteOrientation, setRemoteOrientation] = useState("landscape");
-  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [remoteStreamReady, setRemoteStreamReady] = useState(false);
+  const [remoteVideoMuted, setRemoteVideoMuted] = useState(true);
   const isInitiatorRef = useRef(false);
+  const videoEnabledRef = useRef(videoEnabled);
+  const audioEnabledRef = useRef(audioEnabled);
+
+  useEffect(() => {
+    videoEnabledRef.current = videoEnabled;
+  }, [videoEnabled]);
+
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
 
   const iceServers = {
     iceServers: [
@@ -56,6 +67,7 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
     }
     setRemoteStreamReady(false);
     setRemoteOrientation("landscape");
+    setRemoteVideoMuted(true);
   }, []);
 
   const attachLocalStreamToPeerConnection = useCallback(
@@ -97,6 +109,16 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
         audio: true,
       });
       localStreamRef.current = stream;
+      if (!videoEnabledRef.current) {
+        stream.getVideoTracks().forEach((track) => {
+          track.enabled = false;
+        });
+      }
+      if (!audioEnabledRef.current) {
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = false;
+        });
+      }
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
@@ -169,10 +191,23 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
         }
       }
 
-      if (remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-        remoteVideoRef.current.playsInline = true;
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.playsInline = true;
+
+      if (incomingTrack?.kind === "video") {
         setRemoteStreamReady(true);
+        setRemoteVideoMuted(incomingTrack.muted);
+        incomingTrack.onmute = () => {
+          setRemoteVideoMuted(true);
+        };
+        incomingTrack.onunmute = () => {
+          setRemoteVideoMuted(false);
+          updateRemoteOrientation();
+        };
+        incomingTrack.onended = () => {
+          setRemoteVideoMuted(true);
+          setRemoteStreamReady(false);
+        };
         updateRemoteOrientation();
         const playPromise = remoteVideoRef.current.play();
         if (playPromise && typeof playPromise.catch === "function") {
@@ -204,9 +239,11 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
       ) {
         console.warn("WebRTC connection failed or disconnected");
         setRemoteStreamReady(false);
+        setRemoteVideoMuted(true);
       }
       if (pc.connectionState === "closed") {
         setRemoteStreamReady(false);
+        setRemoteVideoMuted(true);
       }
     };
 
@@ -384,6 +421,12 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
             playsInline
             className={`remote-video ${remoteOrientation === "portrait" ? "portrait" : ""}`}
           />
+          {remoteStreamReady && remoteVideoMuted && (
+            <div className="video-off-overlay remote">
+              <span className="video-off-icon">📵</span>
+              <span>Камера собеседника выключена</span>
+            </div>
+          )}
           {!remoteStreamReady && (
             <div className="waiting-overlay">
               <div className="spinner"></div>
@@ -400,6 +443,12 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
             muted
             className="local-video"
           />
+          {!videoEnabled && (
+            <div className="video-off-overlay local">
+              <span className="video-off-icon">📵</span>
+              <span>Камера выключена</span>
+            </div>
+          )}
         </div>
       </div>
 
