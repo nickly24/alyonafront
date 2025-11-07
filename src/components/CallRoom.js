@@ -6,6 +6,8 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
   const remoteVideoRef = useRef(null);
   const localStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const remoteMediaStreamRef = useRef(new MediaStream());
+  const [remoteOrientation, setRemoteOrientation] = useState("landscape");
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [remoteStreamReady, setRemoteStreamReady] = useState(false);
@@ -26,6 +28,13 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
       });
       localStreamRef.current = null;
     }
+    if (remoteMediaStreamRef.current) {
+      remoteMediaStreamRef.current.getTracks().forEach((track) => {
+        remoteMediaStreamRef.current.removeTrack(track);
+        track.stop();
+      });
+      remoteMediaStreamRef.current = new MediaStream();
+    }
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.ontrack = null;
@@ -41,9 +50,12 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
       localVideoRef.current.srcObject = null;
     }
     if (remoteVideoRef.current) {
+      remoteVideoRef.current.onloadedmetadata = null;
+      remoteVideoRef.current.onresize = null;
       remoteVideoRef.current.srcObject = null;
     }
     setRemoteStreamReady(false);
+    setRemoteOrientation("landscape");
   }, []);
 
   const attachLocalStreamToPeerConnection = useCallback(
@@ -67,6 +79,16 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
     },
     [],
   );
+
+  const updateRemoteOrientation = useCallback(() => {
+    const videoEl = remoteVideoRef.current;
+    if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) {
+      return;
+    }
+    const orientation =
+      videoEl.videoHeight > videoEl.videoWidth ? "portrait" : "landscape";
+    setRemoteOrientation(orientation);
+  }, []);
 
   const initializeMedia = useCallback(async () => {
     try {
@@ -121,30 +143,37 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
 
     attachLocalStreamToPeerConnection(pc);
 
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteMediaStreamRef.current;
+      remoteVideoRef.current.onloadedmetadata = updateRemoteOrientation;
+      remoteVideoRef.current.onresize = updateRemoteOrientation;
+    }
+
     pc.ontrack = (event) => {
-      console.log("Received remote track", event.streams);
+      console.log("Received remote track", event.track?.kind);
+      if (!remoteMediaStreamRef.current) {
+        remoteMediaStreamRef.current = new MediaStream();
+      }
       if (!remoteVideoRef.current) {
         return;
       }
 
-      let remoteStream = null;
-      if (event.streams && event.streams.length > 0) {
-        [remoteStream] = event.streams;
-      } else {
-        const currentStream = remoteVideoRef.current.srcObject;
-        if (currentStream instanceof MediaStream) {
-          remoteStream = currentStream;
-          if (!remoteStream.getTrackById(event.track.id)) {
-            remoteStream.addTrack(event.track);
-          }
-        } else {
-          remoteStream = new MediaStream([event.track]);
+      const remoteStream = remoteMediaStreamRef.current;
+      const incomingTrack = event.track;
+      if (incomingTrack) {
+        const alreadyExists = remoteStream
+          .getTracks()
+          .some((track) => track.id === incomingTrack.id);
+        if (!alreadyExists) {
+          remoteStream.addTrack(incomingTrack);
         }
       }
 
       if (remoteStream) {
         remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current.playsInline = true;
         setRemoteStreamReady(true);
+        updateRemoteOrientation();
         const playPromise = remoteVideoRef.current.play();
         if (playPromise && typeof playPromise.catch === "function") {
           playPromise.catch((err) => {
@@ -187,7 +216,13 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
         createOffer();
       }, 300);
     }
-  }, [attachLocalStreamToPeerConnection, createOffer, socket, username]);
+  }, [
+    attachLocalStreamToPeerConnection,
+    createOffer,
+    socket,
+    updateRemoteOrientation,
+    username,
+  ]);
 
   const handleOffer = useCallback(
     async (data) => {
@@ -340,12 +375,14 @@ function CallRoom({ socket, username, otherUser, callStatus, onLeaveCall }) {
       </div>
 
       <div className="video-container">
-        <div className="remote-video-wrapper">
+        <div
+          className={`remote-video-wrapper ${remoteOrientation === "portrait" ? "portrait" : ""}`}
+        >
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className="remote-video"
+            className={`remote-video ${remoteOrientation === "portrait" ? "portrait" : ""}`}
           />
           {!remoteStreamReady && (
             <div className="waiting-overlay">
